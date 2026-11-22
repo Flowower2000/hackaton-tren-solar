@@ -60,9 +60,9 @@ export default function App() {
           </nav>
         </div>
       </header>
-      <main className="app-main">
-        <View />
-      </main>
+      <div className="app-main">
+        {active === 'dashboard' ? <View /> : <main><View /></main>}
+      </div>
       <footer className="app-footer">Prototipo con datos demostrativos · Jujuy, Argentina</footer>
     </div>
   )
