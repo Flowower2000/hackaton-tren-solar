@@ -1,0 +1,79 @@
+import { useEffect } from 'react'
+import { CircleMarker, MapContainer, Popup, TileLayer, Tooltip, useMap } from 'react-leaflet'
+import 'leaflet/dist/leaflet.css'
+import type { MonitoredZone } from '../../shared/types'
+import { formatDate, formatDelta, formatValue, getZoneChange, trendColor, trendLabel, trendSymbol } from './zoneTrend'
+
+const JUJUY_CENTER: [number, number] = [-23.3, -65.4]
+const JUJUY_ZOOM = 7
+const FOCUS_ZOOM = 8
+
+interface Props {
+  zones: MonitoredZone[]
+  selectedId: string | null
+  onSelect: (id: string) => void
+}
+
+function FlyToSelected({ zone }: { zone: MonitoredZone | undefined }) {
+  const map = useMap()
+  const lat = zone?.location.lat
+  const lng = zone?.location.lng
+  useEffect(() => {
+    if (lat === undefined || lng === undefined) return
+    map.flyTo([lat, lng], Math.max(map.getZoom(), FOCUS_ZOOM), { duration: 0.6 })
+  }, [map, lat, lng])
+  return null
+}
+
+export function SatelliteMap({ zones, selectedId, onSelect }: Props) {
+  const selected = zones.find(zone => zone.id === selectedId)
+  return (
+    <MapContainer
+      center={JUJUY_CENTER}
+      zoom={JUJUY_ZOOM}
+      scrollWheelZoom
+      className="h-[420px] w-full rounded-lg"
+      aria-label="Mapa de zonas monitoreadas en Jujuy"
+    >
+      <TileLayer
+        attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
+        url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+      />
+      {zones.map(zone => {
+        const change = getZoneChange(zone)
+        const color = trendColor[change.trend]
+        const isSelected = zone.id === selectedId
+        return (
+          <CircleMarker
+            key={zone.id}
+            center={[zone.location.lat, zone.location.lng]}
+            radius={isSelected ? 14 : 10}
+            pathOptions={{
+              color: isSelected ? '#0f172a' : color,
+              fillColor: color,
+              fillOpacity: isSelected ? 0.85 : 0.6,
+              weight: isSelected ? 4 : 2,
+            }}
+            eventHandlers={{ click: () => onSelect(zone.id) }}
+          >
+            <Tooltip direction="top" offset={[0, -8]}>{zone.name}</Tooltip>
+            <Popup>
+              <div className="space-y-1 text-sm">
+                <p className="font-semibold">{zone.name}</p>
+                <p className="text-slate-600">{zone.indicator}</p>
+                <p>Anterior: <span className="tabular-nums">{formatValue(zone.previousValue, zone.unit)}</span></p>
+                <p>Actual: <span className="tabular-nums">{formatValue(zone.currentValue, zone.unit)}</span></p>
+                <p style={{ color }}>
+                  {trendSymbol[change.trend]} {trendLabel[change.trend]}: <span className="tabular-nums">{formatDelta(change, zone.unit)}</span>
+                </p>
+                <p className="text-xs text-slate-500">Observado el {formatDate(zone.observedAt)}</p>
+                {zone.simulated && <p className="text-xs font-semibold uppercase text-amber-700">Dato simulado</p>}
+              </div>
+            </Popup>
+          </CircleMarker>
+        )
+      })}
+      <FlyToSelected zone={selected} />
+    </MapContainer>
+  )
+}
