@@ -1,9 +1,10 @@
 import { useState, type ChangeEvent, type FormEvent } from 'react'
 import { createReport, getReports } from '../../shared/repository'
 import type { EnvironmentalReport, Priority, ReportCategory } from '../../shared/types'
+import { LocationPreview } from './LocationPreview'
 import { approximateKilobytes, compressPhoto, isQuotaError, PhotoError } from './photo'
 import {
-  CATEGORY_LABELS, DESCRIPTION_MAX, TITLE_MAX, draftCoordinates, emptyDraft, validateDraft,
+  CATEGORY_LABELS, DESCRIPTION_MAX, TITLE_MAX, draftCoordinates, emptyDraft, isInsideJujuy, parseCoordinate, validateDraft,
   type DraftErrors, type ReportDraft,
 } from './validation'
 
@@ -37,6 +38,12 @@ export default function CitizenReportModule() {
     setLastCreated(undefined)
   }
 
+  function setPoint(lat: number, lng: number) {
+    setDraft(current => ({ ...current, lat: lat.toFixed(5), lng: lng.toFixed(5) }))
+    setErrors(current => ({ ...current, location: undefined }))
+    setLastCreated(undefined)
+  }
+
   function requestCurrentLocation() {
     if (!('geolocation' in navigator)) {
       setLocationState({ kind: 'error', message: 'Tu navegador no permite obtener la ubicación. Cargá las coordenadas a mano.' })
@@ -45,9 +52,8 @@ export default function CitizenReportModule() {
     setLocationState({ kind: 'locating' })
     navigator.geolocation.getCurrentPosition(
       position => {
-        setDraft(current => ({ ...current, lat: position.coords.latitude.toFixed(5), lng: position.coords.longitude.toFixed(5) }))
+        setPoint(position.coords.latitude, position.coords.longitude)
         setLocationState({ kind: 'idle' })
-        setErrors(current => ({ ...current, location: undefined }))
       },
       () => setLocationState({ kind: 'error', message: 'No pudimos obtener tu ubicación. Revisá el permiso o cargá las coordenadas a mano.' }),
       { enableHighAccuracy: true, timeout: 15_000, maximumAge: 60_000 },
@@ -100,6 +106,12 @@ export default function CitizenReportModule() {
         : 'No se pudo guardar el reporte. Intentá de nuevo.')
     }
   }
+
+  const previewLat = parseCoordinate(draft.lat)
+  const previewLng = parseCoordinate(draft.lng)
+  const previewPoint = previewLat !== undefined && previewLng !== undefined && isInsideJujuy(previewLat, previewLng)
+    ? { lat: previewLat, lng: previewLng }
+    : undefined
 
   const recent = [...reports].sort((a, b) => b.createdAt.localeCompare(a.createdAt)).slice(0, 5)
 
@@ -165,6 +177,12 @@ export default function CitizenReportModule() {
                 onChange={e => update('lng', e.target.value)} aria-invalid={!!errors.location} placeholder="-65.29700" />
             </div>
           </div>
+          <div className="mt-3 overflow-hidden rounded-md border border-slate-200">
+            <LocationPreview point={previewPoint} onPick={setPoint} />
+          </div>
+          <p className="mt-1 text-xs text-slate-500">
+            {previewPoint ? 'Punto marcado en el mapa. Tocá otro lugar para corregirlo.' : 'También podés tocar el mapa para marcar el lugar.'}
+          </p>
           <div className="mt-3">
             <label htmlFor="citizen-report-label" className="text-xs text-slate-600">Referencia del lugar (opcional)</label>
             <input id="citizen-report-label" className={inputClass} value={draft.label} maxLength={80}

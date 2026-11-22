@@ -29,7 +29,7 @@ export type DraftErrors = Partial<Record<keyof ReportDraft | 'location', string>
 
 export const emptyDraft: ReportDraft = { title: '', description: '', category: '', lat: '', lng: '', label: '' }
 
-function parseCoordinate(value: string): number | undefined {
+export function parseCoordinate(value: string): number | undefined {
   const trimmed = value.trim().replace(',', '.')
   if (trimmed === '') return undefined
   const parsed = Number(trimmed)
